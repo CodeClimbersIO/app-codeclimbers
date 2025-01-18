@@ -77,7 +77,8 @@ export const FlowRecapPage = () => {
 
           <div className="h-40 my-8">
             <FlowChart
-              data={generateMockData()}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              data={generateMockData() as any}
               flowScore={state?.flowScore}
             />
           </div>
@@ -126,8 +127,8 @@ export const FlowRecapPage = () => {
             </div>
           </div>
 
-          <Button 
-            onClick={handleFinish} 
+          <Button
+            onClick={handleFinish}
             className="w-full"
             disabled={rating === null}
           >

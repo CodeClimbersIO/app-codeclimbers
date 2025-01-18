@@ -1,4 +1,4 @@
-use std::thread;
+use std::{thread, time::Duration};
 use tokio;
 
 mod db;
@@ -32,6 +32,9 @@ async fn main() {
                 .add_migrations(&format!("sqlite:{db_path}"), migrations)
                 .build(),
         )
+        .invoke_handler(tauri::generate_handler![
+            system_monitor::simulate_main_thread_block
+        ])
         .setup(|app| {
             let app_handle = app.handle().clone();
             system_monitor::start_monitoring(app_handle);

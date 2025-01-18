@@ -8,7 +8,7 @@ export const getEbbDb = async () => {
     return ebbDb
   }
   const homeDirectory = await homeDir()
-  const ebbDbPath = await join(homeDirectory, '.ebb', 'ebb-desktop.sqlite')
+  const ebbDbPath = await join(homeDirectory, '.ebb', 'ebb-desktop-new.sqlite')
   ebbDb = await Database.load(`sqlite:${ebbDbPath}`)
   return ebbDb
 }

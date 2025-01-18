@@ -5,7 +5,6 @@ import { DateTime, Duration } from 'luxon'
 import { MonitorApi } from '../monitorApi'
 import { FlowSessionDb } from '../../db/flowSession'
 
-const SHOULD_SAVE_FLOW_PERIOD = true
 interface Period {
   start: DateTime
   end: DateTime
@@ -171,6 +170,8 @@ const createFlowPeriod = async (period: FlowPeriod): Promise<QueryResult> => {
   return FlowPeriodDb.createFlowPeriod(period)
 }
 
+const SHOULD_SAVE_FLOW_PERIOD = false
+
 const calculateFlowPeriodScore = async (period: Period, previousFlowPeriodId: number | undefined)=>{
   console.log('Calculating flow period score')
   const session = await FlowSessionDb.getInProgressFlowSession()
@@ -242,8 +243,8 @@ const startFlowPeriodScoreJob = async (intervalMs = TEN_MINUTES): Promise<void> 
       const lastFlowPeriod = await FlowPeriodDb.getLastFlowPeriod()
       const period = getNextFlowPeriod(lastFlowPeriod, intervalMs)
       await calculateFlowPeriodScore(period, lastFlowPeriod?.id)
-    }, intervalMs)
-  }, initialWait)
+    }, 30 * 1000)
+  }, 1000)
 }
 
 export const FlowPeriodApi = {

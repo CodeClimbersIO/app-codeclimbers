@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core'
 import { HashRouter, Route, Routes, Navigate, Outlet } from 'react-router-dom'
 import { HomePage } from '@/pages/HomePage'
 import { LoginPage } from '@/pages/LoginPage'
@@ -11,6 +12,7 @@ import { FlowPeriodApi } from './api/ebbApi/flowPeriodApi'
 import { BreathingExercisePage } from './pages/BreathingExercisePage'
 import { FlowRecapPage } from '@/pages/FlowRecapPage'
 import { LoadingScreen } from '@/components/LoadingScreen'
+
 
 // Protected Route wrapper component
 const ProtectedRoute = () => {
@@ -52,6 +54,11 @@ export const AppRoutes = () => {
 export const AppRouter = () => {
   return (
     <HashRouter>
+      <button
+        onClick={() => invoke('simulate_main_thread_block', { seconds: 5 })}
+      >
+        Block Main Thread (5 seconds)
+      </button>
       <AppRoutes />
     </HashRouter>
   )

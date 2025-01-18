@@ -12,7 +12,7 @@ const getMonitorDb = async () => {
   const monitorDbPath = await join(
     homeDirectory,
     '.codeclimbers',
-    'codeclimbers-desktop.sqlite',
+    'codeclimbers-desktop-new.sqlite',
   )
   monitorDb = await Database.load(`sqlite:${monitorDbPath}`)
   return monitorDb

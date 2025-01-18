@@ -8,7 +8,7 @@ pub fn get_db_path() -> String {
     let home_dir = dirs::home_dir().expect("Could not find home directory");
     home_dir
         .join(".codeclimbers")
-        .join("codeclimbers-desktop.sqlite")
+        .join("codeclimbers-desktop-new.sqlite")
         .to_str()
         .expect("Invalid path")
         .to_string()
