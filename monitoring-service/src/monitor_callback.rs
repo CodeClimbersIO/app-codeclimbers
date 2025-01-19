@@ -4,12 +4,12 @@ use std::time::Duration;
 
 use crate::services;
 
-static ACTIVITY_STATE_INTERVAL: Duration = Duration::from_secs(1); // every 30 seconds
+static ACTIVITY_STATE_INTERVAL: Duration = Duration::from_secs(30); // every 30 seconds
 
 async fn get_callback() -> Arc<impl EventCallback> {
     let activity_service = Arc::new(services::activities_service::start_monitoring().await);
 
-    activity_service.start_activity_state_loop(ACTIVITY_STATE_INTERVAL);
+    // activity_service.start_activity_state_loop(ACTIVITY_STATE_INTERVAL);
 
     activity_service
 }

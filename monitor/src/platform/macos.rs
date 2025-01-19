@@ -1,4 +1,5 @@
 use crate::event::WindowEvent;
+use crate::utils::log;
 use crate::{bindings, event::EventCallback};
 use crate::{KeyboardEvent, MonitorError, MouseEvent, MouseEventType};
 use once_cell::sync::Lazy;
@@ -24,8 +25,11 @@ static FOCUSED_WINDOW: Mutex<WindowTitle> = Mutex::new(WindowTitle {
 
 fn detect_focused_window() {
     unsafe {
+        log::log("detect_focused_window start");
         let window_title: *const bindings::RawWindowTitle = bindings::detect_focused_window();
+        log::log("detect_focused_window end");
         if window_title.is_null() {
+            log::log("detect_focused_window null");
             return;
         }
 
@@ -37,20 +41,27 @@ fn detect_focused_window() {
             .unwrap();
 
         {
+            log::log("detect_focused_window lock");
             let mut window_title_guard = FOCUSED_WINDOW.lock().unwrap();
+            log::log("detect_focused_window lock end");
             let callback_guard = CALLBACK.lock().unwrap();
+            log::log("detect_focused_window callback_guard");
             if app_name.to_string() != window_title_guard.app_name
                 || title.to_string() != window_title_guard.title
             {
+                log::log("detect_focused_window callback");
                 if let Some(callback) = callback_guard.as_ref() {
+                    log::log("detect_focused_window callback Some");
                     callback.on_window_event(WindowEvent {
                         title: title.to_string(),
                         app_name: app_name.to_string(),
                     });
+                    log::log("detect_focused_window callback Some end");
                 }
             }
             window_title_guard.title = title.to_string();
             window_title_guard.app_name = app_name.to_string();
+            log::log("detect_focused_window lock end");
         }
     }
 }
@@ -101,15 +112,21 @@ pub(crate) fn platform_initialize_callback(
 }
 
 pub(crate) fn platform_detect_changes() -> Result<(), MonitorError> {
+    log::log("platform_detect_changes start");
     unsafe {
         bindings::process_events();
     }
+    log::log("processed events");
     detect_focused_window();
-
+    log::log("detected focused window");
     let mut last_send = LAST_SEND.lock().unwrap();
+    log::log(&format!("last_send: {:?}", last_send.elapsed()));
     if last_send.elapsed() >= Duration::from_secs(30) {
+        log::log("sending buffered events");
         send_buffered_events();
+        log::log("sent buffered events");
         *last_send = Instant::now();
     }
+    log::log("platform_detect_changes end");
     Ok(())
 }

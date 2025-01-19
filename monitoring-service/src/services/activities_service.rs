@@ -5,9 +5,12 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use tokio::sync::mpsc;
 
-use crate::db::{
-    activity_repo::ActivityRepo, activity_state_repo::ActivityStateRepo, db_manager,
-    models::Activity,
+use crate::{
+    db::{
+        activity_repo::ActivityRepo, activity_state_repo::ActivityStateRepo, db_manager,
+        models::Activity,
+    },
+    utils::log,
 };
 
 use self::activity_state_service::ActivityPeriod;
@@ -22,8 +25,13 @@ use crate::db::models::ActivityState;
 #[cfg(test)]
 use time::OffsetDateTime;
 
+#[cfg(not(test))]
 static APP_SWITCH_STATE: Lazy<Mutex<AppSwitchState>> =
-    Lazy::new(|| Mutex::new(AppSwitchState::new(Duration::from_secs(2))));
+    Lazy::new(|| Mutex::new(AppSwitchState::new(Duration::from_secs(0))));
+
+#[cfg(test)]
+static APP_SWITCH_STATE: Lazy<Mutex<AppSwitchState>> =
+    Lazy::new(|| Mutex::new(AppSwitchState::new(Duration::from_secs(0))));
 
 #[derive(Clone)]
 pub struct ActivityService {
@@ -59,11 +67,11 @@ impl EventCallback for ActivityService {
     }
 
     fn on_window_event(&self, event: WindowEvent) {
-        println!("on_window_event: {:?}", event);
+        log::log(&format!("on_window_event: {:?}", event));
         let mut app_switch_state = APP_SWITCH_STATE.lock();
         let activity = Activity::create_window_activity(&event);
         app_switch_state.new_window_activity(activity);
-        println!("app_switches: {}", app_switch_state.app_switches);
+        log::log(&format!("app_switches: {}", app_switch_state.app_switches));
         if let Err(e) = self.event_sender.send(ActivityEvent::Window(event)) {
             eprintln!("Failed to send window event: {}", e);
         }
@@ -71,23 +79,28 @@ impl EventCallback for ActivityService {
 }
 impl ActivityService {
     async fn handle_keyboard_activity(&self) {
+        log::log("handle_keyboard_activity");
         let activity = Activity::create_keyboard_activity();
+        log::log("created keyboard activity");
         if let Err(err) = self.save_activity(&activity).await {
             eprintln!("Failed to save keyboard activity: {}", err);
         }
     }
 
     async fn handle_mouse_activity(&self) {
-        println!("handle_mouse_activity");
+        log::log("handle_mouse_activity");
         let activity = Activity::create_mouse_activity();
+        log::log("created mouse activity");
         if let Err(err) = self.save_activity(&activity).await {
             eprintln!("Failed to save mouse activity: {}", err);
         }
     }
 
     async fn handle_window_activity(&self, event: WindowEvent) {
+        log::log("handle_window_activity");
+        log::log("handle_window_activity");
         let activity = Activity::create_window_activity(&event);
-
+        log::log("created window activity");
         if let Err(err) = self.save_activity(&activity).await {
             eprintln!("Failed to save window activity: {}", err);
         }
@@ -159,36 +172,38 @@ impl ActivityService {
         activity_period: ActivityPeriod,
     ) -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
         // iterate over the activities to create the start, end, context_switches, and activity_state_type
-        println!(
+        log::log(&format!(
             "\n\ncreate_activity_state_from_activities: {:?}",
             activities
-        );
-        println!(
+        ));
+        log::log(&format!(
             "create_activity_state_from_activities: {}",
             activities.len()
-        );
+        ));
 
         if activities.is_empty() {
-            println!("create_activity_state_from_activities: empty");
+            log::log("create_activity_state_from_activities: empty");
             self.activity_state_repo
                 .create_idle_activity_state(&activity_period)
                 .await
         } else {
-            println!("create_activity_state_from_activities: not empty");
+            log::log("create_activity_state_from_activities: not empty");
             // First lock: Get the context switches
             let context_switches = {
                 let app_switch = APP_SWITCH_STATE.lock();
                 app_switch.app_switches.clone()
             }; // lock is released here
+            log::log("retrieved context_switches");
             let result = self
                 .activity_state_repo
                 .create_active_activity_state(context_switches, &activity_period)
                 .await;
-
+            log::log("created activity state");
             {
                 let mut app_switch = APP_SWITCH_STATE.lock();
                 app_switch.reset_app_switches();
             } // lock is released here
+            log::log("reset app switches");
             result
         }
     }
@@ -215,21 +230,24 @@ impl ActivityService {
         tokio::spawn(async move {
             let mut wait_interval = tokio::time::interval(activity_state_interval);
             loop {
-                println!("tick");
+                log::log("tick");
                 wait_interval.tick().await;
+                log::log("after tick");
                 let activities = activity_service_clone
                     .get_activities_since_last_activity_state()
                     .await
                     .unwrap();
+                log::log("retrieved latest activites");
                 let activity_period = activity_state_service_clone
                     .get_next_activity_state_times(activity_state_interval)
                     .await;
+                log::log("retrieved next activity state times");
                 activity_service_clone
                     .create_activity_state_from_activities(activities, activity_period)
                     .await
                     .expect("Failed to create activity state");
 
-                println!("activity_state_created\n");
+                log::log("activity_state_created\n");
             }
         });
     }
@@ -245,8 +263,11 @@ pub async fn start_monitoring() -> ActivityService {
 #[cfg(test)]
 mod tests {
 
+    use std::sync::Arc;
+
     use monitor::WindowEvent;
     use time::OffsetDateTime;
+    use tokio::time::sleep;
 
     use super::*;
     use crate::db::{
@@ -404,5 +425,68 @@ mod tests {
             .unwrap();
 
         assert_eq!(activity_states.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_window_event_and_activity_state() {
+        // Setup
+        let pool = db_manager::create_test_db().await;
+        let service = Arc::new(ActivityService::new(pool));
+
+        // Start the activity state loop with a very short interval
+        service.start_activity_state_loop(Duration::from_millis(10));
+
+        // Spawn a task that rapidly sends window events
+        let window_event_task = tokio::spawn(async move {
+            for i in 0..1000 {
+                let event = WindowEvent {
+                    title: format!("Window {}", i),
+                    app_name: format!("test_process_{}", i),
+                };
+                service.on_window_event(event);
+                service.on_keyboard_events(vec![KeyboardEvent { key_code: 65 }]);
+                service.on_mouse_events(vec![]);
+                sleep(Duration::from_millis(1)).await;
+            }
+        });
+
+        // Wait a bit to ensure we hit the race condition
+        sleep(Duration::from_secs(2)).await;
+
+        // If we reach here without deadlocking, the test passes
+        window_event_task.abort();
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_operations_with_timeout() {
+        use tokio::time::timeout;
+
+        // Setup
+        let pool = db_manager::create_test_db().await;
+        let service = Arc::new(ActivityService::new(pool));
+
+        // Start the activity state loop
+        service.start_activity_state_loop(Duration::from_millis(1));
+
+        // Wrap the concurrent operations in a timeout
+        let result = timeout(Duration::from_secs(5), async {
+            let window_event_task = tokio::spawn(async move {
+                for i in 0..1000 {
+                    let event = WindowEvent {
+                        title: format!("Window {}", i),
+                        app_name: format!("test_process_{}", i),
+                    };
+                    service.on_window_event(event);
+                    sleep(Duration::from_millis(1)).await;
+                }
+            });
+
+            // Wait for the task to complete or timeout
+            window_event_task.await.expect("Window event task failed");
+        })
+        .await;
+
+        // The test passes if we complete within the timeout
+        assert!(result.is_ok(), "Test timed out, likely due to deadlock");
     }
 }

@@ -6,6 +6,10 @@ use std::time::SystemTime;
 use tauri::async_runtime;
 use tauri::AppHandle;
 use tokio::time::{sleep, Duration};
+pub fn log(message: &str) {
+    let thread_name = thread::current().name().unwrap_or("unnamed").to_string();
+    println!("\x1B[34m{}\x1B[0m: {}", thread_name, message);
+}
 
 // Shared counter for main thread operations
 static LAST_MAIN_THREAD_COMPLETION: AtomicU64 = AtomicU64::new(0);
@@ -17,27 +21,35 @@ pub fn start_monitoring(app: AppHandle) {
     start_heartbeat_monitor(app.clone());
 
     async_runtime::spawn(async move {
-        println!("Initializing monitor in async runtime...");
+        log("Initializing monitor in async runtime...");
         monitoring_service::initialize_monitor().await;
-        println!("Monitor initialized");
+        log("Monitor initialized");
 
         loop {
             println!("Monitor loop iteration starting");
             sleep(Duration::from_secs(1)).await;
             let start = std::time::Instant::now();
 
-            let _ = app.run_on_main_thread(move || {
-                println!("Executing on main thread");
-                let result = monitoring_service::detect_changes();
-                println!("Main thread execution completed in {:?}", start.elapsed());
+            let _ = app
+                .run_on_main_thread(move || {
+                    log("Executing on main thread");
+                    let result = monitoring_service::detect_changes();
+                    log(&format!(
+                        "Main thread execution completed in {:?}",
+                        start.elapsed()
+                    ));
 
-                // Only update completion time after successful main thread operation
-                update_main_thread_completion();
+                    // Only update completion time after successful main thread operation
+                    update_main_thread_completion();
 
-                result.expect("Failed to detect changes");
-            });
+                    result.expect("Failed to detect changes");
+                })
+                .unwrap_or_else(|e| {
+                    log(&format!("Failed to run on main thread: {}", e));
+                    panic!("Failed to run on main thread: {}", e);
+                });
 
-            println!("Monitor loop iteration completed");
+            log("Monitor loop iteration completed");
         }
     });
 }
@@ -194,7 +206,7 @@ fn get_memory_usage() -> Option<String> {
 /// Simulates blocking the main thread for the specified duration in seconds
 #[tauri::command]
 pub fn simulate_main_thread_block(seconds: u64) {
-    println!("Blocking main thread for {} seconds...", seconds);
+    log(&format!("Blocking main thread for {} seconds...", seconds));
     thread::sleep(Duration::from_secs(seconds));
-    println!("Main thread block completed");
+    log("Main thread block completed");
 }
