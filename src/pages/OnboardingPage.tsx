@@ -1,6 +1,5 @@
 import { Layout } from '@/components/Layout'
 import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Code2, Paintbrush, Wand2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useSettings } from '../hooks/useSettings'

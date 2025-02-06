@@ -38,19 +38,15 @@ export const StartFlowPage = () => {
     return saved ? JSON.parse(saved) : []
   })
   const [selectedPlaylist, setSelectedPlaylist] = useState('')
-  const [musicService, setMusicService] = useState<{
-    type: 'spotify' | 'apple' | null,
-    connected: boolean,
-    playlists: { id: string, name: string }[]
-  }>({
-    type: 'spotify', // This should come from your auth state
-    connected: true, // This should come from your auth state
-    playlists: [     // This should come from your API
+  const musicService = {
+    type: 'spotify' as const,
+    connected: true,
+    playlists: [
       { id: '1', name: 'Focus Flow' },
       { id: '2', name: 'Deep Work' },
       { id: '3', name: 'Coding Mode' },
     ]
-  })
+  }
   const [allowList, setAllowList] = useState(false)
   const [showBlockingSection, setShowBlockingSection] = useState(false)
   const [showMusicSection, setShowMusicSection] = useState(false)
