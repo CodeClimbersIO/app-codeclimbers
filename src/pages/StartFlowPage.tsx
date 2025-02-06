@@ -26,6 +26,7 @@ import { AppCategory } from '../lib/app-directory/apps-types'
 import { TimeSelector } from '@/components/TimeSelector'
 import { AppSelector } from '@/components/AppSelector'
 import type { AppDefinition } from '@/lib/app-directory/apps-types'
+import { useMusicService } from '../hooks/useMusicService'
 
 type SearchOption = AppDefinition | { type: 'category', category: AppCategory, count: number }
 
@@ -38,18 +39,10 @@ export const StartFlowPage = () => {
     return saved ? JSON.parse(saved) : []
   })
   const [selectedPlaylist, setSelectedPlaylist] = useState('')
-  const musicService = {
-    type: 'spotify' as const,
-    connected: true,
-    playlists: [
-      { id: '1', name: 'Focus Flow' },
-      { id: '2', name: 'Deep Work' },
-      { id: '3', name: 'Coding Mode' },
-    ]
-  }
+  const { musicService, loading, connectToSpotify } = useMusicService()
   const [allowList, setAllowList] = useState(false)
   const [showBlockingSection, setShowBlockingSection] = useState(false)
-  const [showMusicSection, setShowMusicSection] = useState(false)
+  const [showMusicSection, setShowMusicSection] = useState(!musicService?.connected)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -148,7 +141,7 @@ export const StartFlowPage = () => {
         {!isExpanded && (
           <span className="text-sm text-muted-foreground">
             {type === 'music'
-              ? `Playing ${musicService.type === 'spotify' ? 'Spotify' : 'Apple Music'}`
+              ? `Playing ${musicService?.type === 'spotify' ? 'Spotify' : 'Apple Music'}`
               : 'Applying last used'
             }
           </span>
@@ -160,6 +153,57 @@ export const StartFlowPage = () => {
         )}
       </div>
     </div>
+  )
+
+  const renderMusicSection = () => (
+    <>
+      {!musicService?.connected ? (
+        <div className="space-y-4 mt-4">
+          <Button 
+            variant="outline" 
+            className="w-full"
+            onClick={connectToSpotify}
+          >
+            Connect with Spotify
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled
+            onClick={() => {/* Apple Music integration coming soon */}}
+          >
+            Connect with Apple Music (Coming Soon)
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 mt-4 mb-4">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="h-2 w-2 rounded-full bg-green-500" />
+              <span className="text-muted-foreground">
+                {musicService.type === 'spotify' ? 'Spotify' : 'Apple Music'} Connected
+              </span>
+            </div>
+          </div>
+
+          <Select value={selectedPlaylist} onValueChange={setSelectedPlaylist}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select a playlist" />
+            </SelectTrigger>
+            <SelectContent>
+              {musicService.playlists.map(playlist => (
+                <SelectItem key={playlist.id} value={playlist.id}>
+                  <div className="flex items-center">
+                    <Music className="h-4 w-4 mr-2" />
+                    {playlist.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </>
+      )}
+    </>
   )
 
   return (
@@ -239,45 +283,7 @@ export const StartFlowPage = () => {
                 onToggle={() => setShowMusicSection(!showMusicSection)}
                 type="music"
               />
-              {showMusicSection && (
-                <>
-                  <div className="flex items-center gap-2 mt-4 mb-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className={`h-2 w-2 rounded-full ${musicService.connected ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <span className="text-muted-foreground">
-                        {musicService.type === 'spotify' ? 'Spotify' : 'Apple Music'}
-                        {musicService.connected ? ' Connected' : ' Disconnected'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {musicService.connected ? (
-                    <Select value={selectedPlaylist} onValueChange={setSelectedPlaylist}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a playlist" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {musicService.playlists.map(playlist => (
-                          <SelectItem key={playlist.id} value={playlist.id}>
-                            <div className="flex items-center">
-                              <Music className="h-4 w-4 mr-2" />
-                              {playlist.name}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => {/* Handle connection */ }}
-                    >
-                      Connect {musicService.type === 'spotify' ? 'Spotify' : 'Apple Music'}
-                    </Button>
-                  )}
-                </>
-              )}
+              {showMusicSection && renderMusicSection()}
             </div>
 
             <Button

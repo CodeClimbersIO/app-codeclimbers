@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Music } from 'lucide-react'
+import { useMusicService } from '../hooks/useMusicService'
 
 const getDurationFormatFromSeconds = (seconds: number) => {
   const duration = Duration.fromMillis(seconds * 1000)
@@ -36,6 +37,9 @@ export const FlowPage = () => {
   const [time, setTime] = useState<string>('00:00')
   const [flowSession, setFlowSession] = useState<FlowSession | null>(null)
   const [showEndDialog, setShowEndDialog] = useState(false)
+  const [player, setPlayer] = useState<any>(null)
+  const [playbackState, setPlaybackState] = useState<any>(null)
+  const { musicService } = useMusicService()
 
   useEffect(() => {
     const init = async () => {
@@ -82,6 +86,39 @@ export const FlowPage = () => {
     return () => clearInterval(interval)
   }, [flowSession])
 
+  useEffect(() => {
+    const script = document.createElement('script')
+    script.src = 'https://sdk.scdn.co/spotify-player.js'
+    script.async = true
+
+    document.body.appendChild(script)
+
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      const player = new window.Spotify.Player({
+        name: 'Flow App Player',
+        getOAuthToken: cb => { cb(localStorage.getItem('spotify_token')) }
+      })
+
+      player.addListener('ready', ({ device_id }) => {
+        console.log('Ready with Device ID', device_id)
+      })
+
+      player.addListener('player_state_changed', state => {
+        setPlaybackState(state)
+      })
+
+      player.connect()
+      setPlayer(player)
+    }
+
+    return () => {
+      document.body.removeChild(script)
+      if (player) {
+        player.disconnect()
+      }
+    }
+  }, [])
+
   const handleEndSession = async () => {
     if (!flowSession) return
     await FlowSessionApi.endFlowSession(flowSession.id)
@@ -98,6 +135,55 @@ export const FlowPage = () => {
         objective: flowSession.objective
       }
     })
+  }
+
+  const handlePlayPause = () => {
+    player.togglePlay()
+  }
+
+  const handlePrevious = () => {
+    player.previousTrack()
+  }
+
+  const handleNext = () => {
+    player.nextTrack()
+  }
+
+  const renderMusicPlayer = () => {
+    if (!playbackState) return null
+
+    const { track_window: { current_track }, paused } = playbackState
+
+    return (
+      <div className="flex flex-col items-center space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl font-semibold">{current_track.name}</h3>
+          <p className="text-sm text-muted-foreground">{current_track.artists[0].name}</p>
+        </div>
+        
+        <div className="w-full space-y-2">
+          <div className="relative w-full h-1 bg-secondary rounded-full overflow-hidden">
+            <div className="absolute h-full w-1/3 bg-primary rounded-full" />
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>1:23</span>
+            <span>3:45</span>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" size="icon" onClick={handlePrevious}>
+            {/* Previous button SVG */}
+          </Button>
+          <Button size="icon" className="h-12 w-12" onClick={handlePlayPause}>
+            {/* Play/Pause button SVG based on paused state */}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleNext}>
+            {/* Next button SVG */}
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -170,34 +256,7 @@ export const FlowPage = () => {
                 </Select>
               </div>
 
-              <div className="flex flex-col items-center space-y-6">
-                <div className="text-center">
-                  <h3 className="text-2xl font-semibold">Midnight Rain</h3>
-                  <p className="text-sm text-muted-foreground">Taylor Swift</p>
-                </div>
-                
-                <div className="w-full space-y-2">
-                  <div className="relative w-full h-1 bg-secondary rounded-full overflow-hidden">
-                    <div className="absolute h-full w-1/3 bg-primary rounded-full" />
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>1:23</span>
-                    <span>3:45</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-4">
-                  <Button variant="ghost" size="icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
-                  </Button>
-                  <Button size="icon" className="h-12 w-12">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
-                  </Button>
-                  <Button variant="ghost" size="icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
-                  </Button>
-                </div>
-              </div>
+              {renderMusicPlayer()}
             </CardContent>
           </Card>
         </div>
