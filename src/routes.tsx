@@ -11,6 +11,7 @@ import { BreathingExercisePage } from './pages/BreathingExercisePage'
 import { FlowRecapPage } from '@/pages/FlowRecapPage'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { OnboardingPage } from '@/pages/OnboardingPage'
+import { useDeepLinkAuth } from '@/hooks/useDeepLinkAuth'
 
 // Protected Route wrapper component
 const ProtectedRoute = () => {
@@ -28,6 +29,9 @@ const ProtectedRoute = () => {
 }
 
 const Router = () => {
+  // Now useNavigate will work here because we're inside HashRouter
+  useDeepLinkAuth()
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

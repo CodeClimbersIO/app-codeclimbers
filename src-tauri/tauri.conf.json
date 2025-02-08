@@ -26,6 +26,13 @@
       "csp": null
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["ebb"]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

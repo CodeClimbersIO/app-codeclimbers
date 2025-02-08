@@ -21,7 +21,6 @@ const endFlowSession = async (id: string): Promise<QueryResult> => {
   if (!flowSession) {
     throw new Error('Flow session not found')
   }
-  console.log('In progress flow session', flowSession)
 
   const flowSessionUpdated: Partial<FlowSession> & { id: string } = {
     id,

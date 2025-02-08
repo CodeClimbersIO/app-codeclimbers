@@ -31,8 +31,11 @@ dist-ssr
 os-monitor
 os-monitor-service
 monitor
-monitoring-service
+monitor-service
 
 *.dylib
 *.dll
 *.a
+
+scripts/*_seed_*.sql
+scripts/apps.csv

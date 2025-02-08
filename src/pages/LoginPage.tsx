@@ -2,24 +2,27 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/ui/logo'
 import supabase from '@/lib/utils/supabase'
+import { openUrl } from '@tauri-apps/plugin-opener'
 
 export const LoginPage = () => {
   const [error, setError] = useState('')
 
   const handleGoogleLogin = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}`,
+          skipBrowserRedirect: true,
+          redirectTo: 'https://ebb.cool/auth-success',
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
           },
-        },
+        }
       })
 
-      if (error) throw error
+      if (!data?.url) throw new Error('No auth URL returned')
+      await openUrl(data.url)
     } catch (err) {
       setError('Failed to login with Google.')
       console.error(err)
