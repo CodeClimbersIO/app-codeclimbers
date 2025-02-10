@@ -13,7 +13,9 @@ export const LoginPage = () => {
         provider: 'google',
         options: {
           skipBrowserRedirect: true,
-          redirectTo: 'https://ebb.cool/auth-success',
+          redirectTo: import.meta.env.DEV 
+            ? 'http://localhost:1420/auth-success'
+            : 'https://ebb.cool/auth-success',
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -22,7 +24,12 @@ export const LoginPage = () => {
       })
 
       if (!data?.url) throw new Error('No auth URL returned')
-      await openUrl(data.url)
+      
+      if (import.meta.env.DEV) {
+        window.location.href = data.url
+      } else {
+        await openUrl(data.url)
+      }
     } catch (err) {
       setError('Failed to login with Google.')
       console.error(err)
