@@ -26,6 +26,7 @@ import { AppCategory } from '../lib/app-directory/apps-types'
 import { TimeSelector } from '@/components/TimeSelector'
 import { AppSelector } from '@/components/AppSelector'
 import type { AppDefinition } from '@/lib/app-directory/apps-types'
+import { useMusicKit } from '@/hooks/useMusicKit'
 
 type SearchOption = AppDefinition | { type: 'category', category: AppCategory, count: number }
 
@@ -38,23 +39,43 @@ export const StartFlowPage = () => {
     return saved ? JSON.parse(saved) : []
   })
   const [selectedPlaylist, setSelectedPlaylist] = useState('')
-  const [musicService] = useState<{
-    type: 'spotify' | 'apple' | null,
-    connected: boolean,
+  const [musicService, setMusicService] = useState<{
+    type: 'spotify' | 'apple' | null
+    connected: boolean
     playlists: { id: string, name: string }[]
   }>({
-    type: 'spotify', // This should come from your auth state
-    connected: true, // This should come from your auth state
-    playlists: [     // This should come from your API
-      { id: '1', name: 'Focus Flow' },
-      { id: '2', name: 'Deep Work' },
-      { id: '3', name: 'Coding Mode' },
-    ]
+    type: null,
+    connected: false,
+    playlists: []
   })
   const [allowList, setAllowList] = useState(false)
   const [showBlockingSection, setShowBlockingSection] = useState(false)
   const [showMusicSection, setShowMusicSection] = useState(false)
   const navigate = useNavigate()
+
+  const { 
+    initialize, 
+    isAuthorized, 
+    authorize, 
+    fetchPlaylists 
+  } = useMusicKit()
+
+  useEffect(() => {
+    const initMusic = async () => {
+      console.log('Starting MusicKit initialization...')
+      await initialize()
+      if (isAuthorized) {
+        console.log('MusicKit is authorized, fetching playlists...')
+        const playlists = await fetchPlaylists()
+        setMusicService({
+          type: 'apple',
+          connected: true,
+          playlists
+        })
+      }
+    }
+    initMusic()
+  }, [initialize, isAuthorized, fetchPlaylists])
 
   useEffect(() => {
     localStorage.setItem('selectedBlocks', JSON.stringify(selectedBlocks))
@@ -166,6 +187,25 @@ export const StartFlowPage = () => {
     </div>
   )
 
+  const handleConnectMusic = async (service: 'apple' | 'spotify') => {
+    if (service === 'apple') {
+      try {
+        console.log('Attempting to connect to Apple Music...')
+        await authorize()
+        console.log('Authorization successful, fetching playlists...')
+        const playlists = await fetchPlaylists()
+        setMusicService({
+          type: 'apple',
+          connected: true,
+          playlists
+        })
+      } catch (error) {
+        console.error('Failed to connect to Apple Music:', error)
+      }
+    }
+    // Spotify implementation will come later
+  }
+
   return (
     <div className="flex flex-col h-screen">
       <div className="flex">
@@ -245,14 +285,21 @@ export const StartFlowPage = () => {
               />
               {showMusicSection && (
                 <>
-                  <div className="flex items-center gap-2 mt-4 mb-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className={`h-2 w-2 rounded-full ${musicService.connected ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <span className="text-muted-foreground">
-                        {musicService.type === 'spotify' ? 'Spotify' : 'Apple Music'}
-                        {musicService.connected ? ' Connected' : ' Disconnected'}
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-4 mt-4 mb-4">
+                    <Button
+                      variant={musicService.type === 'apple' ? 'secondary' : 'outline'}
+                      onClick={() => handleConnectMusic('apple')}
+                      className="flex-1"
+                    >
+                      Apple Music
+                    </Button>
+                    <Button
+                      variant={musicService.type === 'spotify' ? 'secondary' : 'outline'}
+                      onClick={() => handleConnectMusic('spotify')}
+                      className="flex-1"
+                    >
+                      Spotify
+                    </Button>
                   </div>
 
                   {musicService.connected ? (
@@ -272,13 +319,9 @@ export const StartFlowPage = () => {
                       </SelectContent>
                     </Select>
                   ) : (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => {/* Handle connection */ }}
-                    >
-                      Connect {musicService.type === 'spotify' ? 'Spotify' : 'Apple Music'}
-                    </Button>
+                    <div className="text-sm text-muted-foreground text-center">
+                      Select a music service to connect
+                    </div>
                   )}
                 </>
               )}
