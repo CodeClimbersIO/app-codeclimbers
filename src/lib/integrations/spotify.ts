@@ -30,10 +30,51 @@ interface SpotifyUserProfile {
   product: string
 }
 
+interface SpotifyPlaylist {
+  id: string
+  name: string
+}
+
 const STORAGE_KEY = 'spotify_tokens'
 
 // Store state in localStorage to verify in callback
 const STATE_KEY = 'spotify_auth_state'
+
+const SPOTIFY_API_BASE = 'https://api.spotify.com/v1'
+
+export interface PlaybackState {
+  track_window: {
+    current_track: {
+      name: string;
+      artists: Array<{ name: string }>;
+    };
+  };
+  paused: boolean;
+  duration: number;
+  position: number;
+}
+
+declare global {
+  namespace Spotify {
+    interface Player {
+      addListener(event: 'player_state_changed', callback: (state: PlaybackState | null) => void): void;
+      addListener(event: 'ready', callback: (data: { device_id: string }) => void): void;
+      connect(): Promise<boolean>;
+      disconnect(): void;
+    }
+  }
+
+  interface Window {
+    Spotify: {
+      Player: new (options: {
+        name: string;
+        getOAuthToken: (cb: (token: string) => void) => void;
+        volume?: number;
+      }) => Spotify.Player;
+    };
+    onSpotifyWebPlaybackSDKReady: () => void;
+  }
+}
 
 export class SpotifyService {
   private static getStoredTokens(): SpotifyTokens | null {
@@ -192,7 +233,7 @@ export class SpotifyService {
 
   static async getUserProfile(): Promise<SpotifyUserProfile | null> {
     try {
-      const response = await fetch('https://api.spotify.com/v1/me', {
+      const response = await fetch(`${SPOTIFY_API_BASE}/me`, {
         headers: {
           'Authorization': `Bearer ${await this.getAccessToken()}`
         }
@@ -212,6 +253,98 @@ export class SpotifyService {
     } catch (error) {
       console.error('Error fetching user profile:', error)
       return null
+    }
+  }
+
+  static async getUserPlaylists(): Promise<{ id: string, name: string }[]> {
+    try {
+      const response = await fetch(`${SPOTIFY_API_BASE}/me/playlists?limit=50`, {
+        headers: {
+          'Authorization': `Bearer ${await this.getAccessToken()}`
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch playlists')
+      }
+      
+      const data = await response.json()
+      return data.items.map((playlist: SpotifyPlaylist) => ({
+        id: playlist.id,
+        name: playlist.name
+      }))
+    } catch (error) {
+      console.error('Error fetching playlists:', error)
+      return []
+    }
+  }
+
+  static async initializePlayer(): Promise<void> {
+    // Load Spotify Web Playback SDK
+    const script = document.createElement('script')
+    script.src = 'https://sdk.scdn.co/spotify-player.js'
+    script.async = true
+    document.body.appendChild(script)
+
+    return new Promise((resolve) => {
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        resolve()
+      }
+    })
+  }
+
+  static async createPlayer(): Promise<Spotify.Player> {
+    const token = await this.getAccessToken()
+    const player = new window.Spotify.Player({
+      name: 'Ebb Flow Player',
+      getOAuthToken: cb => cb(token),
+      volume: 0.5
+    })
+
+    await player.connect()
+    return player
+  }
+
+  static async startPlayback(playlistId: string, deviceId: string): Promise<void> {
+    const token = await this.getAccessToken()
+    
+    await fetch(`${SPOTIFY_API_BASE}/me/player/play?device_id=${deviceId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        context_uri: `spotify:playlist:${playlistId}`,
+        shuffle: true,
+      }),
+    })
+  }
+
+  static async controlPlayback(action: 'play' | 'pause' | 'next' | 'previous', deviceId: string): Promise<void> {
+    const token = await this.getAccessToken()
+    
+    if (action === 'play') {
+      await fetch(`${SPOTIFY_API_BASE}/me/player/play?device_id=${deviceId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      })
+    } else if (action === 'pause') {
+      await fetch(`${SPOTIFY_API_BASE}/me/player/pause?device_id=${deviceId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      })
+    } else {
+      await fetch(`${SPOTIFY_API_BASE}/me/player/${action}?device_id=${deviceId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      })
     }
   }
 } 

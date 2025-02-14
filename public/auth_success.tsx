@@ -1,8 +1,8 @@
 // *This is a reference file. The actual file is hosted on Framer website
 
-import type { ComponentType } from "react"
-import * as React from "react"
-import { createStore } from "https://framer.com/m/framer/store.js@^1.0.0"
+import type { ComponentType } from 'react'
+import * as React from 'react'
+import { createStore } from 'https://framer.com/m/framer/store.js@^1.0.0'
 
 const useStore = createStore({
     isRedirecting: false,

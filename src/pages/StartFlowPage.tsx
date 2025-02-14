@@ -35,12 +35,22 @@ type SearchOption = AppDefinition | { type: 'category', category: AppCategory, c
 export const StartFlowPage = () => {
   const { userRole } = useSettings()
   const [objective, setObjective] = useState('')
-  const [duration, setDuration] = useState<number | null>(null)
+  const [duration, setDuration] = useState<number | null>(() => {
+    const saved = localStorage.getItem('lastDuration')
+    return saved ? JSON.parse(saved) : null
+  })
   const [selectedBlocks, setSelectedBlocks] = useState<SearchOption[]>(() => {
     const saved = localStorage.getItem('selectedBlocks')
     return saved ? JSON.parse(saved) : []
   })
-  const [selectedPlaylist, setSelectedPlaylist] = useState('')
+  const [allowList, setAllowList] = useState(() => {
+    const saved = localStorage.getItem('allowList')
+    return saved ? JSON.parse(saved) : false
+  })
+  const [selectedPlaylist, setSelectedPlaylist] = useState(() => {
+    const saved = localStorage.getItem('lastPlaylist')
+    return saved || ''
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [musicService, setMusicService] = useState<{
     type: 'spotify' | 'apple' | null,
@@ -52,7 +62,6 @@ export const StartFlowPage = () => {
     playlists: []
   })
   const [spotifyProfile, setSpotifyProfile] = useState<{ email: string; display_name: string | null; product: string } | null>(null)
-  const [allowList, setAllowList] = useState(false)
   const [showBlockingSection, setShowBlockingSection] = useState(false)
   const [showMusicSection, setShowMusicSection] = useState(() => {
     const hashParams = window.location.hash.replace('#', '')
@@ -64,6 +73,18 @@ export const StartFlowPage = () => {
   useEffect(() => {
     localStorage.setItem('selectedBlocks', JSON.stringify(selectedBlocks))
   }, [selectedBlocks])
+
+  useEffect(() => {
+    localStorage.setItem('lastDuration', JSON.stringify(duration))
+  }, [duration])
+
+  useEffect(() => {
+    localStorage.setItem('allowList', JSON.stringify(allowList))
+  }, [allowList])
+
+  useEffect(() => {
+    localStorage.setItem('lastPlaylist', selectedPlaylist)
+  }, [selectedPlaylist])
 
   // Combine the two separate useEffects into one that handles both initial load
   // and auth callback
@@ -101,17 +122,17 @@ export const StartFlowPage = () => {
       const isConnected = await SpotifyService.isConnected()
       
       if (isConnected) {
-        const profile = await SpotifyService.getUserProfile()
+        const [profile, playlists] = await Promise.all([
+          SpotifyService.getUserProfile(),
+          SpotifyService.getUserPlaylists()
+        ])
+        
         if (profile) {
           setSpotifyProfile(profile)
           setMusicService({
             type: 'spotify',
             connected: true,
-            playlists: [
-              { id: '1', name: 'Focus Flow' },
-              { id: '2', name: 'Deep Work' },
-              { id: '3', name: 'Coding Mode' },
-            ]
+            playlists: playlists
           })
         }
       }
@@ -131,6 +152,17 @@ export const StartFlowPage = () => {
       window.history.replaceState({}, '', '#/start-flow')
     }
   }, [])
+
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' && objective) {
+        handleBegin()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyPress)
+    return () => document.removeEventListener('keydown', handleKeyPress)
+  }, [objective]) // Re-run when objective changes
 
   const getPlaceholderByRole = () => {
     switch (userRole) {
@@ -224,7 +256,7 @@ export const StartFlowPage = () => {
         {!isExpanded && (
           <span className="text-sm text-muted-foreground">
             {type === 'music'
-              ? `Playing ${musicService.type === 'spotify' ? 'Spotify' : 'Apple Music'}`
+              ? musicService.playlists.find(p => p.id === selectedPlaylist)?.name || 'No playlist selected'
               : 'Applying last used'
             }
           </span>
@@ -408,6 +440,9 @@ export const StartFlowPage = () => {
               disabled={!objective}
             >
               Start Focus Session
+              <kbd className="ml-2 rounded bg-violet-900 px-1.5 font-mono text-xs">
+                ↵
+              </kbd>
             </Button>
           </CardContent>
         </Card>
