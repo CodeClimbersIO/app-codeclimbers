@@ -9,8 +9,10 @@ import { App } from '../db/monitor/appRepo'
 import { AppIcon } from './AppIcon'
 import { Tag } from '../db/monitor/tagRepo'
 import { Button } from '@/components/ui/button'
-import { DifficultySelector } from './DifficultySelector'
+import { DifficultySelector } from '@/components/difficulty-selector'
 import { CategoryTooltip } from './CategoryTooltip'
+import { PaywallDialog } from './PaywallDialog'
+import { usePermissions } from '@/hooks/usePermissions'
 
 interface CategoryOption {
   type: 'category'
@@ -109,6 +111,7 @@ export function AppSelector({
   difficulty,
   onDifficultyChange
 }: AppSelectorProps) {
+  const { canUseAllowList, canUseHardDifficulty } = usePermissions()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const inputRef = useRef<HTMLDivElement>(null)
@@ -403,6 +406,20 @@ export function AppSelector({
     return categoryData?.count ?? 0
   }
 
+  const handleDifficultyChange = (value: 'easy' | 'medium' | 'hard') => {
+    if (value === 'hard' && !canUseHardDifficulty) {
+      return
+    }
+    onDifficultyChange?.(value)
+  }
+
+  const handleAllowListChange = (value: boolean) => {
+    if (value && !canUseAllowList) {
+      return
+    }
+    onIsAllowListChange?.(value)
+  }
+
   const renderCommandContent = filteredOptions.length === 0 ? (
     <CommandEmpty>
       {search && isAlreadySelected(search).isSelected
@@ -487,11 +504,13 @@ export function AppSelector({
             )}
           </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 flex justify-between items-center gap-1 pt-2 px-3 pb-2 border-t">
+        <div className="absolute bottom-0 left-0 right-0 flex justify-between items-center gap-1 pt-2 px-3 pb-2 border-t"
+          onClick={(e) => e.stopPropagation()}>
           {onDifficultyChange && (
             <DifficultySelector
               value={difficulty || null}
-              onChange={onDifficultyChange}
+              onChange={handleDifficultyChange}
+              disabledOptions={!canUseHardDifficulty ? ['hard'] : []}
             />
           )}
           
@@ -506,26 +525,41 @@ export function AppSelector({
                 )}
                 onClick={(e) => {
                   e.stopPropagation()
-                  onIsAllowListChange(false)
+                  handleAllowListChange(false)
                 }}
               >
                 Block
               </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  'h-6 px-2 text-xs text-muted-foreground/80 hover:text-foreground',
-                  isAllowList && 'bg-muted/50'
-                )}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onIsAllowListChange(true)
-                }}
-              >
-                Allow
-              </Button>
+              {!canUseAllowList ? (
+                <PaywallDialog>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'h-6 px-2 text-xs text-muted-foreground/80 hover:text-foreground',
+                      isAllowList && 'bg-muted/50'
+                    )}
+                  >
+                    Allow
+                  </Button>
+                </PaywallDialog>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    'h-6 px-2 text-xs text-muted-foreground/80 hover:text-foreground',
+                    isAllowList && 'bg-muted/50'
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleAllowListChange(true)
+                  }}
+                >
+                  Allow
+                </Button>
+              )}
             </div>
           )}
         </div>

@@ -11,23 +11,32 @@ import { FlowRecapPage } from '@/pages/FlowRecapPage'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { AccessibilityPage } from './pages/AccessibilityPage'
 import { ShortcutTutorialPage } from '@/pages/ShortcutTutorialPage'
+import { DeviceLimitPage } from './pages/DeviceLimitPage'
 import { OnboardingUtils } from '@/lib/utils/onboarding'
 import { useDeepLinkAuth } from './hooks/useDeepLinkAuth'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useEffect } from 'react'
 import { useGlobalShortcut } from './hooks/useGlobalShortcut'
 import { error as logError } from '@tauri-apps/plugin-log'
+import { useLicenseStore } from './stores/licenseStore'
+
 
 const ProtectedRoute = () => {
-  const { user, loading } = useAuth()
+  const { user, loading: authLoading } = useAuth()
+  const { deviceInfo } = useLicenseStore()
   const location = useLocation()
 
-  if (loading) {
+
+  if (authLoading) {
     return <LoadingScreen />
   }
 
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  if (deviceInfo.isDeviceLimitReached) {
+    return <DeviceLimitPage />
   }
 
   if (location.pathname === '/onboarding/accessibility' ||

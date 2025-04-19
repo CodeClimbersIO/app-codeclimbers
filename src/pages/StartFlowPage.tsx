@@ -172,7 +172,7 @@ export const StartFlowPage = () => {
       // If this is the first session (no workflows), create one from current settings
       if (workflows.length === 0) {
         const newWorkflow: Workflow = {
-          name: 'New Preset',
+          name: 'New Profile',
           selectedApps,
           selectedPlaylist,
           selectedPlaylistName: null,

@@ -2,6 +2,7 @@ import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { info } from '@tauri-apps/plugin-log'
 import { FlowSessionApi } from '../api/ebbApi/flowSessionApi'
+import { isDev } from '../lib/utils/environment'
 
 export const checkAndUpdate = async () => {
   const flowSession = await FlowSessionApi.getInProgressFlowSession()
@@ -16,17 +17,17 @@ export const checkAndUpdate = async () => {
     let contentLength = 0
     await update.downloadAndInstall((event) => {
       switch (event.event) {
-        case 'Started':
-          contentLength = event.data.contentLength ?? 0
-          info(`started downloading ${event.data.contentLength} bytes`)
-          break
-        case 'Progress':
-          downloaded += event.data.chunkLength
-          info(`downloaded ${downloaded} from ${contentLength}`)
-          break
-        case 'Finished':
-          info('download finished')
-          break
+      case 'Started':
+        contentLength = event.data.contentLength ?? 0
+        info(`started downloading ${event.data.contentLength} bytes`)
+        break
+      case 'Progress':
+        downloaded += event.data.chunkLength
+        info(`downloaded ${downloaded} from ${contentLength}`)
+        break
+      case 'Finished':
+        info('download finished')
+        break
       }
     })
 
@@ -37,7 +38,7 @@ export const checkAndUpdate = async () => {
 
 export const useUpdate = () => {
   const beginCheckForUpdates = () => {
-    if (import.meta.env.DEV) return
+    if (isDev()) return
     
     checkAndUpdate()
     const interval = setInterval(checkAndUpdate, 60 * 1000)

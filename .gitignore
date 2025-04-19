@@ -50,3 +50,7 @@ scripts/apps.csv
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Supabase
+supabase/supabase/
+supabase/.branches

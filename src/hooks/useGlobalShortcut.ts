@@ -7,7 +7,7 @@ import { OnboardingUtils } from '@/lib/utils/onboarding'
 import {
   initializeGlobalShortcut,
   SHORTCUT_EVENT,
-} from '@/db/ebb/globalShortcutManager'
+} from '@/api/ebbApi/shortcutApi'
 import { error as logError } from '@tauri-apps/plugin-log'
 
 export function useGlobalShortcut() {

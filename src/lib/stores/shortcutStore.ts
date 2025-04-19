@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { loadShortcut } from '@/db/ebb/globalShortcutManager'
+import { loadShortcut } from '@/api/ebbApi/shortcutApi'
 
 interface ShortcutState {
   shortcutParts: string[]

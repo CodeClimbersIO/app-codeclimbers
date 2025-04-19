@@ -1,5 +1,5 @@
 import { QueryResult } from '@tauri-apps/plugin-sql'
-import { FlowSession, FlowSessionRepo, FlowSessionSchema } from '../../db/ebb/flowSessionRepo'
+import { FlowSession, FlowSessionRepo, FlowSessionSchema } from '@/db/ebb/flowSessionRepo'
 
 const startFlowSession = async (
   objective: string, 

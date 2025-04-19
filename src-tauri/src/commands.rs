@@ -274,3 +274,18 @@ pub fn detect_spotify() -> bool {
             .unwrap_or(false)
     }
 }
+
+#[command]
+pub fn get_mac_address() -> Result<String, String> {
+    match mac_address::get_mac_address() {
+        Ok(Some(addr)) => {
+            println!("Found MAC address: {}", addr);
+            Ok(addr.to_string())
+        },
+        Ok(None) => Err("No MAC address found on this device".to_string()),
+        Err(e) => {
+            println!("Error getting MAC address: {}", e);
+            Err(format!("Failed to get MAC address: {}", e))
+        }
+    }
+}

@@ -1,4 +1,4 @@
-import { Plus, Pencil, Trash2, Settings } from 'lucide-react'
+import { Pencil, Trash2, Settings } from 'lucide-react'
 import { motion } from 'motion/react'
 import {
   Dialog,
@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils/tailwind.util'
 import { Button } from './ui/button'
 import { Switch } from '@/components/ui/switch'
 import { error as logError } from '@tauri-apps/plugin-log'
+import { PaywallDialog } from '@/components/PaywallDialog'
+import { usePermissions } from '@/hooks/usePermissions'
 
 interface WorkflowSelectorProps {
   selectedId: string | null
@@ -33,7 +35,6 @@ interface WorkflowBadgeProps {
   workflow: Workflow
   isSelected: boolean
   onClick: () => void
-  onCreateClick?: () => void
   onRename?: (newName: string) => void
   onDelete?: () => void
   onUpdateSettings?: (settings: Workflow['settings']) => void
@@ -45,7 +46,6 @@ function WorkflowBadge({
   workflow, 
   isSelected,
   onClick,
-  onCreateClick,
   onRename,
   onDelete,
   onUpdateSettings,
@@ -64,7 +64,6 @@ function WorkflowBadge({
     e.preventDefault()
     e.stopPropagation()
     setIsEditing(true)
-    // Force focus after a short delay to ensure cursor shows
     setTimeout(() => {
       if (editableRef.current) {
         editableRef.current.focus()
@@ -124,7 +123,6 @@ function WorkflowBadge({
   useEffect(() => {
     if (isEditing && editableRef.current) {
       editableRef.current.focus()
-      // Select all text
       const range = document.createRange()
       range.selectNodeContents(editableRef.current)
       const selection = window.getSelection()
@@ -204,10 +202,6 @@ function WorkflowBadge({
                 <span>Advanced</span>
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem onClick={onCreateClick}        className="cursor-pointer">
-                <Plus className="mr-2 h-4 w-4" />
-                <span>New Preset</span>
-              </ContextMenuItem>
               <ContextMenuItem 
                 onClick={() => setShowDeleteDialog(true)} 
                 className="cursor-pointer text-destructive focus:text-destructive"
@@ -223,7 +217,7 @@ function WorkflowBadge({
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Preset</DialogTitle>
+            <DialogTitle>Delete Profile</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete "{workflow.name}"? This action cannot be undone.
             </DialogDescription>
@@ -285,15 +279,14 @@ export function WorkflowSelector({ selectedId, onSelect, onSettingsChange }: Wor
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [workflows, setWorkflows] = useState<Workflow[]>([])
   const [showLeftMask, setShowLeftMask] = useState(false)
+  const { canUseMultipleProfiles } = usePermissions()
 
-  // Handle scroll position to determine if left mask should be shown
   const handleScroll = () => {
     if (scrollContainerRef.current) {
       setShowLeftMask(scrollContainerRef.current.scrollLeft > 0)
     }
   }
 
-  // Setup scroll event listener
   useEffect(() => {
     const container = scrollContainerRef.current
     if (container) {
@@ -302,7 +295,6 @@ export function WorkflowSelector({ selectedId, onSelect, onSettingsChange }: Wor
     }
   }, [])
 
-  // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
@@ -327,7 +319,6 @@ export function WorkflowSelector({ selectedId, onSelect, onSettingsChange }: Wor
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [workflows, selectedId, onSelect])
 
-  // Auto-scroll selected workflow into view
   useEffect(() => {
     if (!selectedId || !scrollContainerRef.current) return
     
@@ -336,41 +327,34 @@ export function WorkflowSelector({ selectedId, onSelect, onSettingsChange }: Wor
     
     if (!selectedElement) return
     
-    // Get the visible area of the container
     const containerRect = container.getBoundingClientRect()
     const elementRect = selectedElement.getBoundingClientRect()
     
-    // Check if the element is not fully visible
     const isFullyVisible = 
       elementRect.left >= containerRect.left && 
       elementRect.right <= containerRect.right
     
     if (isFullyVisible) return
     
-    // Calculate distance from element center to container center
     const containerCenter = containerRect.left + containerRect.width / 2
     const elementCenter = elementRect.left + elementRect.width / 2
     const scrollDistance = elementCenter - containerCenter
     
-    // Scroll the container
     container.scrollBy({
       left: scrollDistance,
       behavior: 'smooth'
     })
   }, [selectedId])
 
-  // Load workflows from database and sort by last selected
   useEffect(() => {
     const loadWorkflows = async () => {
       try {
         const loadedWorkflows = await WorkflowApi.getWorkflows()
-        // Sort by lastSelected (newest first)
         const sortedWorkflows = [...loadedWorkflows].sort((a, b) => 
           (b.lastSelected || 0) - (a.lastSelected || 0)
         )
         setWorkflows(sortedWorkflows)
         
-        // If no workflow is selected and we have workflows, select the most recent one
         if (!selectedId && sortedWorkflows.length > 0) {
           if (sortedWorkflows[0].id) {
             onSelect(sortedWorkflows[0].id)
@@ -386,8 +370,12 @@ export function WorkflowSelector({ selectedId, onSelect, onSettingsChange }: Wor
 
   const handleSelect = async (workflowId: string) => {
     if (workflowId === 'new') {
+      if (workflows.length >= 1 && !canUseMultipleProfiles) {
+        return
+      }
+
       const newWorkflow: Workflow = {
-        name: 'New Preset',
+        name: 'New Profile',
         selectedApps: [],
         selectedPlaylist: null,
         lastSelected: Date.now(),
@@ -440,11 +428,9 @@ export function WorkflowSelector({ selectedId, onSelect, onSettingsChange }: Wor
     try {
       await WorkflowApi.deleteWorkflow(workflow.id)
       
-      // Refresh workflows from database
       const updatedWorkflows = await WorkflowApi.getWorkflows()
       setWorkflows(updatedWorkflows)
       
-      // If the deleted workflow was selected, select the first available one
       if (selectedId === workflow.id && updatedWorkflows.length > 0 && updatedWorkflows[0].id) {
         onSelect(updatedWorkflows[0].id)
       }
@@ -502,7 +488,7 @@ export function WorkflowSelector({ selectedId, onSelect, onSettingsChange }: Wor
               className='cursor-pointer border-dashed'
               onClick={() => handleSelect('new')}
             >
-              Create preset
+              Create profile
             </Badge>
           ) : (
             <>
@@ -512,7 +498,6 @@ export function WorkflowSelector({ selectedId, onSelect, onSettingsChange }: Wor
                   workflow={workflow}
                   isSelected={workflow.id === selectedId}
                   onClick={() => workflow.id && handleSelect(workflow.id)}
-                  onCreateClick={() => handleSelect('new')}
                   onRename={(newName) => handleRename(workflow, newName)}
                   onDelete={() => handleDelete(workflow)}
                   onUpdateSettings={(settings) => handleUpdateSettings(workflow, settings)}
@@ -522,13 +507,24 @@ export function WorkflowSelector({ selectedId, onSelect, onSettingsChange }: Wor
               
               {workflows.length < 6 && (
                 <motion.div layout>
-                  <Badge 
-                    variant='secondary' 
-                    className='cursor-pointer border-dashed opacity-50 px-4'
-                    onClick={() => handleSelect('new')}
-                  >
-                    +
-                  </Badge>
+                  {workflows.length >= 1 && !canUseMultipleProfiles ? (
+                    <PaywallDialog>
+                      <Badge 
+                        variant='secondary' 
+                        className='cursor-pointer border-dashed opacity-50 px-4'
+                      >
+                        +
+                      </Badge>
+                    </PaywallDialog>
+                  ) : (
+                    <Badge 
+                      variant='secondary' 
+                      className='cursor-pointer border-dashed opacity-50 px-4'
+                      onClick={() => handleSelect('new')}
+                    >
+                      +
+                    </Badge>
+                  )}
                 </motion.div>
               )}
             </>

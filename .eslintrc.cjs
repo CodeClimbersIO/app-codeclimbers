@@ -12,22 +12,21 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'plugin:import/recommended',
     'plugin:import/typescript',
-    // 'plugin:prettier/recommended',
   ],
-  ignorePatterns: ['.eslintrc.cjs'],
+  ignorePatterns: ['.eslintrc.cjs', 'supabase/functions/**/*.ts'],
   settings: {
     "import/resolver": {
-      typescript: {},
+      typescript: {
+        project: './tsconfig.json',
+        alwaysTryTypes: true
+      },
       alias: {
         map: [["@", "./src"]],
+        extensions: ['.ts', '.tsx', '.js', '.jsx', '.json']
       },
     },
   },
   rules: {
-    // 'prettier/prettier': [
-    //   'error',
-    //   { semi: false, singleQuote: true, endOfLine: 'auto' },
-    // ],
 
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
@@ -38,6 +37,7 @@ module.exports = {
     'semi': ['error', 'never'],
     'quotes': ['error', 'single'],
     'eol-last': ['error', 'always'],
+    'indent': ['error', 2],
   },
   overrides: [
     {

@@ -4,7 +4,7 @@ import {
 } from '@tauri-apps/plugin-global-shortcut'
 import { emit } from '@tauri-apps/api/event'
 import { error as logError, info as logInfo } from '@tauri-apps/plugin-log'
-import { UserPreferenceRepo } from './userPreferenceRepo'
+import { UserPreferenceRepo } from '@/db/ebb/userPreferenceRepo'
 
 export const DEFAULT_SHORTCUT = 'CommandOrControl+E'
 export const SHORTCUT_EVENT = 'global-shortcut-triggered'
@@ -92,8 +92,8 @@ export const initializeGlobalShortcut = async (): Promise<void> => {
     }
     isInitialized = true
   } catch (err) {
-     logError(`(Global) Failed to initialize shortcut: ${err}`)
-     isInitialized = true
+    logError(`(Global) Failed to initialize shortcut: ${err}`)
+    isInitialized = true
   }
 }
 

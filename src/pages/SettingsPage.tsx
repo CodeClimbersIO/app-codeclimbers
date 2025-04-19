@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { SpotifyIcon } from '@/components/icons/SpotifyIcon'
 import { AppleMusicIcon } from '@/components/icons/AppleMusicIcon'
-import { GoogleIcon } from '@/components/icons/GoogleIcon'
 import { DiscordIcon } from '@/components/icons/DiscordIcon'
 import { GithubIcon } from '@/components/icons/GithubIcon'
 import {
@@ -16,7 +15,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { SpotifyApiService } from '@/lib/integrations/spotify/spotifyApi'
 import { SpotifyAuthService } from '@/lib/integrations/spotify/spotifyAuth'
@@ -24,14 +22,18 @@ import supabase from '@/lib/integrations/supabase'
 import { ResetAppData } from '@/components/developer/ResetAppData'
 import { version } from '../../package.json'
 import { useAuth } from '@/hooks/useAuth'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { invoke } from '@tauri-apps/api/core'
 import { ShortcutInput } from '@/components/ShortcutInput'
 import { Switch } from '@/components/ui/switch'
 import { isEnabled } from '@tauri-apps/plugin-autostart'
 import { error as logError } from '@tauri-apps/plugin-log'
+import { ActiveDevicesSettings } from '@/components/ActiveDevicesSettings'
+import { UserProfileSettings } from '@/components/UserProfileSettings'
+import { userApi } from '@/api/ebbApi/userApi'
+import { isDev } from '@/lib/utils/environment'
+import { usePermissions } from '@/hooks/usePermissions'
 
-export const SettingsPage = () => {
+export function SettingsPage() {
   const [showUnlinkDialog, setShowUnlinkDialog] = useState(false)
   const [activeService, setActiveService] = useState<'spotify' | 'apple' | null>(null)
   const [serviceToUnlink, setServiceToUnlink] = useState<'spotify' | 'apple' | null>(null)
@@ -46,9 +48,12 @@ export const SettingsPage = () => {
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const { user } = useAuth()
+  const { maxDevices } = usePermissions()
+
 
   useEffect(() => {
-    const handleSpotifyCallback = async () => {
+    const initializeSettings = async () => {
+      setIsLoading(true)
       try {
         const hashParams = window.location.hash.replace('#', '')
         const searchParams = new URLSearchParams(window.location.search || hashParams.substring(hashParams.indexOf('?')))
@@ -56,32 +61,31 @@ export const SettingsPage = () => {
         const state = searchParams.get('state')
 
         if (code && state) {
-          setIsLoading(true)
           await SpotifyAuthService.handleCallback(code, state)
-          // Clear URL parameters
           window.history.replaceState({}, '', '/settings')
-          // Force a full page refresh to get updated Spotify state
-          window.location.reload()
-          return
         }
 
-        // Always check connection status after handling callback or on initial load
-        await checkSpotifyConnection()
+        const isConnected = await SpotifyAuthService.isConnected()
+        if (isConnected) {
+          const profile = await SpotifyApiService.getUserProfile()
+          if (profile) {
+            setSpotifyProfile(profile)
+            setActiveService('spotify')
+          }
+        }
       } catch (error) {
         logError(`Error handling Spotify callback: ${error}`)
         setIsLoading(false)
       }
-    }
 
-    handleSpotifyCallback()
-
-    // Scroll to music integrations section if hash is present
-    if (window.location.hash === '#music-integrations') {
-      const section = document.getElementById('music-integrations')
-      if (section) {
-        section.scrollIntoView({ behavior: 'smooth' })
+      if (window.location.hash === '#music-integrations') {
+        const section = document.getElementById('music-integrations')
+        if (section) {
+          section.scrollIntoView({ behavior: 'smooth' })
+        }
       }
     }
+    initializeSettings()
   }, [])
 
   useEffect(() => {
@@ -91,25 +95,6 @@ export const SettingsPage = () => {
     }
     checkAutostart()
   }, [])
-
-  const checkSpotifyConnection = async () => {
-    try {
-      const isConnected = await SpotifyAuthService.isConnected()
-
-      if (isConnected) {
-        const profile = await SpotifyApiService.getUserProfile()
-        if (profile) {
-          setSpotifyProfile(profile)
-          setActiveService('spotify')
-        }
-      }
-
-      setIsLoading(false)
-    } catch (error) {
-      logError(`Error checking Spotify connection: ${error}`)
-      setIsLoading(false)
-    }
-  }
 
   const handleUnlink = (service: 'spotify' | 'apple') => {
     setServiceToUnlink(service)
@@ -137,30 +122,8 @@ export const SettingsPage = () => {
   const handleDeleteAccount = async () => {
     try {
       setIsDeleting(true)
+      await userApi.deleteAccount()
 
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('No session found')
-
-      // Make API call to your backend endpoint to delete the user
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-account`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'x-client-info': 'codeclimbers'
-          }
-        }
-      )
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to delete account')
-      }
-
-      // Sign out the user after successful deletion
       await supabase.auth.signOut()
       navigate('/')
     } catch (error) {
@@ -169,12 +132,6 @@ export const SettingsPage = () => {
       setIsDeleting(false)
       setShowDeleteAccountDialog(false)
     }
-  }
-
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
-    navigate('/login')
   }
 
   const handleAutostartToggle = async () => {
@@ -194,30 +151,13 @@ export const SettingsPage = () => {
             <h1 className="text-2xl font-semibold mb-8">Settings</h1>
 
             <div className="space-y-8">
+              <UserProfileSettings user={user} />
+
               <div className="border rounded-lg p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={user?.user_metadata?.avatar_url} />
-                      <AvatarFallback>
-                        {(user?.user_metadata?.full_name || user?.email || 'U')[0].toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h2 className="text-lg font-semibold">
-                        {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
-                      </h2>
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <GoogleIcon className="h-3.5 w-3.5" />
-                        <span>{user?.email}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <Button variant="outline" onClick={handleLogout}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                </div>
+                <ActiveDevicesSettings 
+                  user={user} 
+                  maxDevices={maxDevices} 
+                />
               </div>
 
               <div className="border rounded-lg p-6">
@@ -389,7 +329,7 @@ export const SettingsPage = () => {
                     <div>
                       <div className="font-medium">Delete Account</div>
                       <div className="text-sm text-muted-foreground">
-                        Permanently delete your account and cloud data. Local usage data will not be deleted.
+                        Permanently delete your account, Ebb license, and cloud data. Local usage data will not be deleted.
                       </div>
                     </div>
                     <div className="flex-shrink-0">
@@ -405,8 +345,7 @@ export const SettingsPage = () => {
               </div>
             </div>
 
-            {/* Developer section - only visible in development mode */}
-            {import.meta.env.DEV && (
+            {isDev() && (
               <div className="mt-12 border-t pt-6">
                 <h2 className="text-xl font-semibold mb-4">Developer Options</h2>
                 <ResetAppData />
@@ -467,11 +406,9 @@ export const SettingsPage = () => {
         <Dialog open={showDeleteAccountDialog} onOpenChange={setShowDeleteAccountDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Delete Account?</DialogTitle>
+              <DialogTitle>Warning: Will Also Delete Your Ebb License</DialogTitle>
               <DialogDescription>
-                This action cannot be undone. This will permanently delete your account
-                and remove all of your scoring and friends data from our servers. Your local usage data
-                will remain.
+                This will permanently delete your account, your Ebb License, and remove all of your scoring and friends data from our servers. This action cannot be undone.  Your local usage data will remain.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

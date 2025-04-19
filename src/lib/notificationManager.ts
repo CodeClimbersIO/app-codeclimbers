@@ -2,6 +2,7 @@ import { error, info } from '@tauri-apps/plugin-log'
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { resolveResource } from '@tauri-apps/api/path'
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { isDev } from './utils/environment'
 
 interface NotificationOptions {
   duration?: number
@@ -33,13 +34,12 @@ class NotificationManager {
         'blocked-app': 'app_blocked.mp3'
       }
 
-      const isDev = import.meta.env.DEV
-      info(`Is development environment: ${isDev}`)
+      info(`Is development environment: ${isDev()}`)
 
       let htmlPath
       let soundPath
 
-      if (isDev) {
+      if (isDev()) {
         htmlPath = `/src-tauri/notifications/html/notification-${type}.html`
         soundPath = `/src-tauri/notifications/sounds/${soundMap[type]}`
       } else {
@@ -69,10 +69,9 @@ class NotificationManager {
   ): Promise<string> {
     try {
       const resources = await this.getNotificationResources(type)
-      const isDev = import.meta.env.DEV
       
       // Construct the URL - resources.html is now already a proper URL in both dev and prod
-      const fullUrl = isDev ? `http://localhost:1420${resources.html}` : resources.html
+      const fullUrl = isDev() ? `http://localhost:1420${resources.html}` : resources.html
       
       const url = new URL(fullUrl)
       url.searchParams.set('duration', duration.toString())
@@ -83,7 +82,7 @@ class NotificationManager {
       }
       
       if (resources.sound) {
-        const soundUrl = isDev ? `http://localhost:1420${resources.sound}` : resources.sound
+        const soundUrl = isDev() ? `http://localhost:1420${resources.sound}` : resources.sound
         url.searchParams.set('sound', soundUrl)
         info(`Final sound URL after encoding: ${url.searchParams.get('sound')}`)
       } else {
@@ -106,18 +105,18 @@ class NotificationManager {
       
       let duration = 5000
       switch (options.type) {
-        case 'session-warning':
-          duration = 12000
-          break
-        case 'session-end':
-          duration = 8000
-          break
-        case 'session-start':
-          duration = 5000
-          break
-        case 'blocked-app':
-          duration = 12000
-          break
+      case 'session-warning':
+        duration = 12000
+        break
+      case 'session-end':
+        duration = 8000
+        break
+      case 'session-start':
+        duration = 5000
+        break
+      case 'blocked-app':
+        duration = 12000
+        break
       }
 
       if (options.duration !== undefined) {
@@ -187,11 +186,11 @@ class NotificationManager {
       }
 
       webviewWindow.listen('notification-close', closeWindow)
-      .then(unlisten => {
-        webviewWindow.once('tauri://destroyed', () => {
-          unlisten()
+        .then(unlisten => {
+          webviewWindow.once('tauri://destroyed', () => {
+            unlisten()
+          })
         })
-      })
 
       webviewWindow.listen('snooze_blocking', async (event: { payload: { duration: number } }) => {
         await invoke('snooze_blocking', {
@@ -199,11 +198,11 @@ class NotificationManager {
         })
       })
       
-      .then(unlisten => {
-        webviewWindow.once('tauri://destroyed', () => {
-          unlisten()
+        .then(unlisten => {
+          webviewWindow.once('tauri://destroyed', () => {
+            unlisten()
+          })
         })
-      })
 
       setTimeout(closeWindow, duration + ANIMATION_DURATION)
 

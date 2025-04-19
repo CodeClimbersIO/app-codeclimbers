@@ -7,6 +7,7 @@ import { useFlowTimer } from './stores/flowTimer'
 import { invoke } from '@tauri-apps/api/core'
 import { Image } from '@tauri-apps/api/image'
 import { error as logError } from '@tauri-apps/plugin-log'
+import { isDev } from './utils/environment'
 
 async function showAndFocusWindow() {
   const mainWindow = Window.getCurrent()
@@ -19,9 +20,8 @@ async function showAndFocusWindow() {
 let timerInterval: NodeJS.Timeout | null = null
 
 const getIconPath = async () => {
-  const isDev = import.meta.env.DEV
   const resolvedIconPath = await resolveResource('icons/tray.png')
-  return isDev ? 'icons/tray.png' : resolvedIconPath
+  return isDev() ? 'icons/tray.png' : resolvedIconPath
 }
 
 function getRemainingDuration(startTime: DateTime, totalDuration: Duration): Duration {
@@ -108,39 +108,39 @@ export const stopFlowTimer = async () => {
 }
 
 export async function setupTray() {
-    const existingTray = await TrayIcon.getById('main-tray')
-    if (existingTray) {
-      return existingTray
-    }
+  const existingTray = await TrayIcon.getById('main-tray')
+  if (existingTray) {
+    return existingTray
+  }
 
-    const iconPath = await getIconPath()
-    const tray = await TrayIcon.new({
-      id: 'main-tray',
-      tooltip: 'Ebb',
-      icon: iconPath,
-      iconAsTemplate: true
-    })
+  const iconPath = await getIconPath()
+  const tray = await TrayIcon.new({
+    id: 'main-tray',
+    tooltip: 'Ebb',
+    icon: iconPath,
+    iconAsTemplate: true
+  })
 
-    const menu = await Menu.new({
-      items: [
-        {
-          text: 'Show Dashboard',
-          action: async () => {
-            await showAndFocusWindow()
-          }
-        },
-        { item: 'Separator' },
-        {
-          text: 'Quit',
-          action: async () => {
-            const window = Window.getCurrent()
-            await window.close()
-            await window.destroy()
-          }
+  const menu = await Menu.new({
+    items: [
+      {
+        text: 'Show Dashboard',
+        action: async () => {
+          await showAndFocusWindow()
         }
-      ]
-    })
+      },
+      { item: 'Separator' },
+      {
+        text: 'Quit',
+        action: async () => {
+          const window = Window.getCurrent()
+          await window.close()
+          await window.destroy()
+        }
+      }
+    ]
+  })
 
-    await tray.setMenu(menu)
-    return tray
+  await tray.setMenu(menu)
+  return tray
 }

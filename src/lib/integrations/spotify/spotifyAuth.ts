@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { SpotifyApiService } from './spotifyApi'
+import { isDev } from '../../utils/environment'
 
 const SPOTIFY_CONFIG = {
   clientId: import.meta.env.VITE_SPOTIFY_CLIENT_ID,
@@ -13,7 +14,7 @@ const SPOTIFY_CONFIG = {
     'user-read-playback-state',
     'user-modify-playback-state',
   ].join(' '),
-  redirectUri: import.meta.env.DEV 
+  redirectUri: isDev() 
     ? 'http://localhost:1420/start-flow?spotify=callback'
     : 'https://ebb.cool/spotify-success'
 }
@@ -98,7 +99,7 @@ export class SpotifyAuthService {
 
     const url = `https://accounts.spotify.com/authorize?${params.toString()}`
     
-    if (import.meta.env.DEV) {
+    if (isDev()) {
       window.location.href = url
     } else {
       await invoke('plugin:shell|open', { path: url })
@@ -106,29 +107,29 @@ export class SpotifyAuthService {
   }
 
   static async handleCallback(code: string, state: string | null): Promise<void> {
-      // Verify state matches what we stored
-      const storedState = localStorage.getItem(STATE_KEY)
+    // Verify state matches what we stored
+    const storedState = localStorage.getItem(STATE_KEY)
       
-      if (state === null || state !== storedState) {
-        throw new Error('State mismatch')
-      }
+    if (state === null || state !== storedState) {
+      throw new Error('State mismatch')
+    }
       
-      // Clear stored state
-      localStorage.removeItem(STATE_KEY)
+    // Clear stored state
+    localStorage.removeItem(STATE_KEY)
 
-      const tokens = await this.exchangeCodeForTokens(code)
+    const tokens = await this.exchangeCodeForTokens(code)
       
-      this.setStoredTokens({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString()
-      })
+    this.setStoredTokens({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+    })
 
-      // Verify connection by fetching profile
-      const profile = await SpotifyApiService.getUserProfile()
-      if (!profile) {
-        throw new Error('Failed to verify connection')
-      }
+    // Verify connection by fetching profile
+    const profile = await SpotifyApiService.getUserProfile()
+    if (!profile) {
+      throw new Error('Failed to verify connection')
+    }
   }
 
   static async disconnect(): Promise<void> {
@@ -184,21 +185,21 @@ export class SpotifyAuthService {
       }),
     }
 
-      const response = await fetch(url, payload)
+    const response = await fetch(url, payload)
       
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`)
-      }
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`)
+    }
       
-      const data = await response.json()
+    const data = await response.json()
       
-      this.setStoredTokens({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token ?? tokens.refresh_token,
-        expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString()
-      })
+    this.setStoredTokens({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token ?? tokens.refresh_token,
+      expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString()
+    })
       
-      return data
+    return data
   }
 
   static async getAuth(): Promise<SpotifyTokens | undefined> {

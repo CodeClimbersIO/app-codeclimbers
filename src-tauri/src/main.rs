@@ -1,10 +1,10 @@
 use tauri::Manager;
 use tokio;
 
+mod autostart;
 mod commands;
 mod db;
 mod system_monitor;
-mod autostart;
 mod tray_icon_gen;
 
 use autostart::{change_autostart, enable_autostart};
@@ -29,6 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_shell::init())
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -79,6 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             commands::restore_app_data_from_backup,
             commands::detect_spotify,
             change_autostart,
+            commands::get_mac_address,
             tray_icon_gen::generate_timer_icon,
         ])
         .build(tauri::generate_context!())?

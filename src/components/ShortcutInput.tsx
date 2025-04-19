@@ -6,7 +6,7 @@ import { X, Check } from 'lucide-react'
 import {
   updateGlobalShortcut,
   loadShortcut as loadInitialShortcut,
-} from '../db/ebb/globalShortcutManager'
+} from '../api/ebbApi/shortcutApi'
 import { useShortcutStore } from '@/lib/stores/shortcutStore'
 import { error as logError } from '@tauri-apps/plugin-log'
 

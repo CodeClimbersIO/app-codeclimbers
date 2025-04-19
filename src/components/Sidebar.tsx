@@ -5,9 +5,12 @@ import { SettingsGearIcon } from '@/components/icons/GearIcon'
 import { HomeIcon } from '@/components/icons/HomeIcon'
 import { UsersIcon } from '@/components/icons/UsersIcon'
 import { KeyIcon } from '@/components/icons/KeyIcon'
+import { PaywallDialog } from '@/components/PaywallDialog'
+import { usePermissions } from '@/hooks/usePermissions'
 
 export function Sidebar() {
   const location = useLocation()
+  const { hasProAccess } = usePermissions()
 
   return (
     <TooltipProvider>
@@ -47,16 +50,15 @@ export function Sidebar() {
             </Tooltip>
           </nav>
 
-          <div className="p-2 border-t flex justify-center">
-            <Tooltip>
-              <TooltipTrigger asChild>
+          {!hasProAccess && (
+            <div className="p-2 border-t flex justify-center">
+              <PaywallDialog>
                 <Button variant="ghost" iconSize={5} className="w-9 h-9 p-2">
                   <KeyIcon size={20} className="text-yellow-500" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10}> Ebb License - Coming Soon</TooltipContent>
-            </Tooltip>
-          </div>
+              </PaywallDialog>
+            </div>
+          )}
 
           <div className="p-2 border-t flex justify-center">
             <Tooltip>
